@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>AI Conversation Summarizer</title>
+
+
+    <!-- Space Grotesk Font -->
+
+    <link rel="preconnect"
+          href="https://fonts.googleapis.com">
+
+    <link rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap"
+          rel="stylesheet">
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            background: #080808;
+            color: #ffffff;
+
+            font-family: "Space Grotesk", sans-serif;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: min(800px, 90%);
+        }
+
+        h1 {
+            font-family: "Space Grotesk", sans-serif;
+
+            font-size: 42px;
+            font-weight: 700;
+
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-family: "Space Grotesk", sans-serif;
+
+            color: #888;
+            margin-bottom: 35px;
+        }
+
+        input {
+            width: 100%;
+
+            padding: 16px;
+
+            background: #121212;
+            color: white;
+
+            border: 1px solid #333;
+            border-radius: 10px;
+
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 15px;
+        }
+
+        button {
+            width: 100%;
+
+            margin-top: 12px;
+            padding: 16px;
+
+            background: white;
+            color: black;
+
+            border: none;
+            border-radius: 10px;
+
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+
+            cursor: pointer;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+
+        /* Summary Output */
+
+        #output {
+
+            margin-top: 30px;
+
+            background: #111;
+            border: 1px solid #222;
+
+            border-radius: 12px;
+
+            padding: 25px;
+
+            min-height: 100px;
+
+            font-family: "Space Grotesk", sans-serif;
+
+            line-height: 1.8;
+
+            white-space: normal;
+
+        }
+
+
+        /* Generated Title */
+
+        #output .summary-title {
+
+            font-size: 1.5em;
+            font-weight: 700;
+
+            margin-bottom: 20px;
+
+        }
+
+
+        /* Paragraphs */
+
+        #output p {
+
+            margin: 0 0 18px 0;
+
+        }
+
+
+        /* Section headings */
+
+        #output .summary-heading {
+
+            font-weight: 700;
+
+            margin-top: 24px;
+            margin-bottom: 10px;
+
+        }
+
+
+        /* Lists */
+
+        #output ol,
+        #output ul {
+
+            margin-top: 8px;
+            margin-bottom: 18px;
+
+            padding-left: 28px;
+
+        }
+
+        #output li {
+
+            margin-bottom: 8px;
+
+        }
+
+
+        /* Bold / Italic */
+
+        #output strong {
+
+            font-weight: 700;
+
+        }
+
+        #output em {
+
+            font-style: italic;
+
+        }
+
+
+        /* Code */
+
+        #output pre {
+
+            overflow-x: auto;
+
+            padding: 15px;
+
+            border-radius: 8px;
+
+            background: #080808;
+
+            margin: 15px 0;
+
+        }
+
+        #output code {
+
+            font-family: monospace;
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+
+    <h1>
+        Conversation Summarizer
+    </h1>
+
+
+    <div class="subtitle">
+        Paste a ChatGPT shared conversation link.
+    </div>
+
+
+    <input
+        id="url"
+        type="text"
+        placeholder="https://chatgpt.com/share/..."
+    >
+
+
+    <button onclick="summarize()">
+        SUMMARIZE
+    </button>
+
+
+    <div id="output">
+        Your summary will appear here.
+    </div>
+
+
+</div>
+
+
+
+<script>
+
+
+async function summarize() {
+
+    const url =
+        document.getElementById("url").value.trim();
+
+    const output =
+        document.getElementById("output");
+
+
+    if (!url) {
+
+        output.textContent =
+            "Please paste a ChatGPT shared link.";
+
+        return;
+    }
+
+
+    output.textContent =
+        "Reading conversation and generating summary...";
+
+
+    try {
+
+        const response =
+            await fetch("/summarize-link", {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    url: url
+                })
+
+            });
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            output.textContent =
+                "Error: " + data.detail;
+
+            return;
+        }
+
+
+        /*
+         * Convert Gemini's formatted text into
+         * clean HTML for proper visual hierarchy.
+         */
+
+        output.innerHTML =
+            formatSummary(data.summary);
+
+
+    } catch (error) {
+
+        output.textContent =
+            "Could not connect to the server.";
+
+        console.error(error);
+
+    }
+
+}
+
+
+
+/*
+ * Gemini output formatter
+ *
+ * Supports:
+ * - Title
+ * - Paragraphs
+ * - Numbered lists
+ * - Dash lists
+ * - Bold
+ * - Italic
+ * - Code blocks
+ * - Simple headings
+ */
+
+function formatSummary(text) {
+
+    const lines =
+        text.trim().split(/\r?\n/);
+
+
+    let html = "";
+
+    let paragraph = [];
+
+    let listType = null;
+
+    let inCodeBlock = false;
+
+    let codeContent = "";
+
+
+    function closeParagraph() {
+
+        if (paragraph.length === 0)
+            return;
+
+        const content =
+            paragraph.join(" ").trim();
+
+        if (content) {
+
+            html +=
+                `<p>${formatInline(content)}</p>`;
+
+        }
+
+        paragraph = [];
+
+    }
+
+
+    function closeList() {
+
+        if (!listType)
+            return;
+
+        html +=
+            listType === "ol"
+                ? "</ol>"
+                : "</ul>";
+
+        listType = null;
+
+    }
+
+
+    function closeCode() {
+
+        if (!inCodeBlock)
+            return;
+
+        html +=
+            `<pre><code>${escapeHTML(codeContent)}</code></pre>`;
+
+        codeContent = "";
+
+        inCodeBlock = false;
+
+    }
+
+
+    lines.forEach((rawLine, index) => {
+
+        const line =
+            rawLine.trim();
+
+
+        /* Code block */
+
+        if (line.startsWith("```")) {
+
+            closeParagraph();
+            closeList();
+
+            if (!inCodeBlock) {
+
+                inCodeBlock = true;
+                codeContent = "";
+
+            } else {
+
+                closeCode();
+
+            }
+
+            return;
+
+        }
+
+
+        if (inCodeBlock) {
+
+            codeContent +=
+                rawLine + "\n";
+
+            return;
+
+        }
+
+
+        /* Empty line */
+
+        if (!line) {
+
+            closeParagraph();
+            closeList();
+
+            return;
+
+        }
+
+
+        /* Numbered list */
+
+        const numberedMatch =
+            line.match(/^(\d+)[.)]\s+(.+)$/);
+
+
+        if (numberedMatch) {
+
+            closeParagraph();
+
+
+            if (listType !== "ol") {
+
+                closeList();
+
+                html += "<ol>";
+
+                listType = "ol";
+
+            }
+
+
+            html +=
+                `<li>${formatInline(numberedMatch[2])}</li>`;
+
+            return;
+
+        }
+
+
+        /* Dash list */
+
+        const dashMatch =
+            line.match(/^[-–—]\s+(.+)$/);
+
+
+        if (dashMatch) {
+
+            closeParagraph();
+
+
+            if (listType !== "ul") {
+
+                closeList();
+
+                html += "<ul>";
+
+                listType = "ul";
+
+            }
+
+
+            html +=
+                `<li>${formatInline(dashMatch[1])}</li>`;
+
+            return;
+
+        }
+
+
+        /* Heading-like line */
+
+        const isHeading =
+            line.length < 80 &&
+            (
+                /^[A-Z][A-Z\s/&-]+$/.test(line) ||
+                line.startsWith("# ")
+            );
+
+
+        if (isHeading) {
+
+            closeParagraph();
+            closeList();
+
+
+            const heading =
+                line.replace(/^#+\s*/, "");
+
+
+            html +=
+                `<div class="summary-heading">${formatInline(heading)}</div>`;
+
+            return;
+
+        }
+
+
+        /* Normal paragraph */
+
+        closeList();
+
+        paragraph.push(line);
+
+    });
+
+
+    closeParagraph();
+    closeList();
+    closeCode();
+
+
+    return html;
+
+}
+
+
+
+/*
+ * Format bold and italic Markdown
+ */
+
+function formatInline(text) {
+
+    let safe =
+        escapeHTML(text);
+
+
+    /*
+     * Bold:
+     * **text**
+     */
+
+    safe =
+        safe.replace(
+            /\*\*(.+?)\*\*/g,
+            "<strong>$1</strong>"
+        );
+
+
+    /*
+     * Italic:
+     * *text*
+     */
+
+    safe =
+        safe.replace(
+            /(^|[^\*])\*([^*\n]+)\*(?!\*)/g,
+            "$1<em>$2</em>"
+        );
+
+
+    return safe;
+
+}
+
+
+
+/*
+ * Prevent Gemini output from injecting HTML.
+ */
+
+function escapeHTML(text) {
+
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+
+</script>
+
+
+</body>
+
+</html>
